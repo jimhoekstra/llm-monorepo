@@ -1,0 +1,35 @@
+#columns {
+    height: 1fr;
+}
+
+#columns > * {
+    width: 1fr;
+    height: 1fr;
+}
+
+#main {
+    padding: 1;
+}
+
+#editor {
+    width: 1fr;
+    height: 1fr;
+    padding: 1;
+    border: round $secondary;
+    background: transparent;
+    scrollbar-visibility: hidden;
+}
+
+#editor:focus {
+    border: round $secondary;
+}
+
+#preview {
+    width: 1fr;
+    height: 1fr;
+    padding: 1;
+    border: round $panel;
+    background: transparent;
+    scrollbar-visibility: hidden;
+    overflow-y: auto;
+}

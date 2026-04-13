@@ -14,9 +14,15 @@ PYTHON_TO_JSON_TYPE_MAP: dict[type, str] = {
 TOOL_REGISTRY: dict[str, Tool] = {}
 
 
-def register_tool():
+def register_tool(description: str) -> Callable[[Callable[..., str]], Callable[..., str]]:
     """
     Decorator to register a function as a tool.
+
+    Parameters
+    ----------
+    description
+        A description of the tool's functionality, which will be included in the
+        tool definition passed to the LLM.
 
     Returns
     -------
@@ -28,12 +34,6 @@ def register_tool():
 
         if tool_name in TOOL_REGISTRY:
             raise ValueError(f"A tool named '{tool_name}' is already registered.")
-
-        description = getdoc(fn)
-        if description is None:
-            raise ValueError(
-                f"Tool function '{tool_name}' must have a docstring as its description."
-            )
 
         tool = Tool(
             name=tool_name,

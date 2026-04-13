@@ -5,7 +5,6 @@ Screen {
 InputGroup {
     dock: bottom;
     height: 8;
-    
     align-horizontal: center;
 }
 
