@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from textual.app import App, ComposeResult
 from textual import work
 
@@ -21,7 +23,7 @@ class ChatApp(App):
     def on_mount(self) -> None:
         self.theme = "catppuccin-mocha"
         self.messages = [
-            build_system_prompt(prompt="You are a helpful assistant. You like emojis.")
+            build_system_prompt(prompt=(Path(__file__).resolve().parent / "prompts" / "system.md").read_text())
         ]
 
     def on_user_input_submitted(self, message: UserInput.Submitted) -> None:
