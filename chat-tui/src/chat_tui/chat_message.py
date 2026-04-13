@@ -22,17 +22,39 @@ class ChatMessage(Container):
         self._role = role
 
     def compose(self) -> ComposeResult:
+        """
+        Compose the chat message widget.
+
+        Returns
+        -------
+        The composed widgets for this chat message.
+        """
         label = Markdown(
             self._text,
             classes=f"chat-message-label chat-message-label-{self._role}",
         )
-        label.border_title = " ".join([w.capitalize() for w in self._role.split("-")])
+        label.border_title = " ".join([word.capitalize() for word in self._role.split("-")])
         yield label
 
     def has_text(self) -> bool:
-        return bool(self._text.strip())
+        """
+        Check whether this message contains non-whitespace text.
+
+        Returns
+        -------
+        True if the message has non-whitespace content, False otherwise.
+        """
+        return len(self._text.strip()) > 0
 
     def append_token(self, token: str) -> None:
+        """
+        Append a token to the message text and update the rendered markdown.
+
+        Parameters
+        ----------
+        token
+            The text token to append.
+        """
         if not self.has_text() and (
             self._role == "reasoning" or self._role == "tool-call"
         ):
@@ -42,12 +64,30 @@ class ChatMessage(Container):
         self.query_one(".chat-message-label", Markdown).update(self._text)
 
     def update_border_subtitle(self, subtitle: str) -> None:
+        """
+        Update the border subtitle of the message label.
+
+        Parameters
+        ----------
+        subtitle
+            The subtitle text to display in the border.
+        """
         self.query_one(".chat-message-label", Markdown).border_subtitle = subtitle
 
     def update_usage(self, usage: TokenUsage, timings: Timings) -> None:
+        """
+        Update the border subtitle with token usage and timing statistics.
+
+        Parameters
+        ----------
+        usage
+            Token usage counts for this message.
+        timings
+            Timing statistics for prompt and prediction.
+        """
         self.update_border_subtitle(
-            f"In: {usage.prompt_tokens} tokens ({timings.prompt_per_second:.1f}/s) "
-            f"- Out: {usage.completion_tokens} tokens ({timings.predicted_per_second:.1f}/s) "
+            f"In: {usage.prompt_tokens} tokens ({int(timings.prompt_per_second)}/s) "
+            f"- Out: {usage.completion_tokens} tokens ({int(timings.predicted_per_second)}/s) "
             f"- Total: {usage.total_tokens} tokens"
         )
 
@@ -61,22 +101,53 @@ class ToolCallChatMessage(ChatMessage):
         self._resolved = asyncio.Event()
 
     def compose(self) -> ComposeResult:
-        for w in super().compose():
-            yield w
+        """
+        Compose the tool call message with approve and reject buttons.
+
+        Returns
+        -------
+        The composed widgets for this tool call message.
+        """
+        for widget in super().compose():
+            yield widget
 
         with Horizontal(classes="tool-call-actions"):
             yield Button("Approve", classes="tool-call-approve")
             yield Button("Reject", classes="tool-call-reject")
 
     def set_tool_call(self, tool_call: ToolCall) -> None:
+        """
+        Set the tool call associated with this message.
+
+        Parameters
+        ----------
+        tool_call
+            The tool call to associate with this message.
+        """
         self.tool_call = tool_call
 
     def _hide_buttons(self) -> None:
+        """
+        Hide the approve and reject buttons.
+        """
         for button in self.query(".tool-call-actions Button"):
             button.display = False
 
     @on(Button.Pressed, ".tool-call-approve")
     def tool_call_approved(self, event: Button.Pressed) -> None:
+        """
+        Handle approval of the tool call.
+
+        Parameters
+        ----------
+        event
+            The button press event.
+
+        Raises
+        ------
+        ValueError
+            When no tool call has been set on this message.
+        """
         if self.tool_call is None:
             raise ValueError("No tool call to approve.")
 
@@ -96,6 +167,19 @@ class ToolCallChatMessage(ChatMessage):
 
     @on(Button.Pressed, ".tool-call-reject")
     def tool_call_rejected(self, event: Button.Pressed) -> None:
+        """
+        Handle rejection of the tool call.
+
+        Parameters
+        ----------
+        event
+            The button press event.
+
+        Raises
+        ------
+        ValueError
+            When no tool call has been set on this message.
+        """
         if self.tool_call is None:
             raise ValueError("No tool call to reject.")
 
@@ -106,6 +190,18 @@ class ToolCallChatMessage(ChatMessage):
         self._hide_buttons()
 
     async def wait_for_result(self) -> ToolCallResult:
+        """
+        Wait until the tool call has been approved or rejected.
+
+        Returns
+        -------
+        The result of the tool call once resolved.
+
+        Raises
+        ------
+        ValueError
+            When the tool call was not resolved properly.
+        """
         await self._resolved.wait()
         if self.tool_call_result is None:
             raise ValueError("Tool call was not resolved properly.")
