@@ -1,7 +1,7 @@
 import asyncio
 
 from textual.app import ComposeResult
-from textual.widgets import Markdown, Button
+from textual.widgets import Markdown, Button, ContentSwitcher, LoadingIndicator
 from textual.containers import Container, Horizontal
 from textual import on
 
@@ -16,6 +16,44 @@ from local_llm.tools import ToolCallResult
 class ChatMessage(Container):
     """A single chat message bubble."""
 
+    DEFAULT_CSS = """
+    ChatMessage {
+        height: auto;
+        margin: 1 0 0 0;
+    }
+
+    ChatMessage ContentSwitcher {
+        height: auto;
+    }
+
+    ChatMessage .chat-message-label {
+        padding: 1 1 0 1;
+        background: transparent;
+    }
+
+    .chat-message-label-assistant {
+        border: round $secondary;
+    }
+
+    .chat-message-label-reasoning {
+        border: round $warning;
+        color: $text-muted;
+    }
+
+    .chat-message-label-tool-call {
+        border: round $success-darken-2;
+    }
+
+    .chat-message-label-user {
+        border: round $panel;
+    }
+
+    #loading-indicator {
+        border: round $panel;
+        height: 5;
+    }
+    """
+
     def __init__(self, text: str, role: str) -> None:
         super().__init__(classes=f"chat-message-{role}")
         self._text = text
@@ -29,12 +67,23 @@ class ChatMessage(Container):
         -------
         The composed widgets for this chat message.
         """
-        label = Markdown(
-            self._text,
-            classes=f"chat-message-label chat-message-label-{self._role}",
-        )
-        label.border_title = " ".join([word.capitalize() for word in self._role.split("-")])
-        yield label
+        show_loading = self.display and not self.has_text()
+        initial = "loading-indicator" if show_loading else "chat-message-content"
+
+        border_title = " ".join([word.capitalize() for word in self._role.split("-")])
+
+        with ContentSwitcher(initial=initial):
+            loading = LoadingIndicator(id="loading-indicator")
+            loading.border_title = border_title
+            yield loading
+
+            label = Markdown(
+                self._text,
+                classes=f"chat-message-label chat-message-label-{self._role}",
+                id="chat-message-content",
+            )
+            label.border_title = border_title
+            yield label
 
     def has_text(self) -> bool:
         """
@@ -55,13 +104,18 @@ class ChatMessage(Container):
         token
             The text token to append.
         """
-        if not self.has_text() and (
+        is_first_token = not self.has_text()
+
+        if is_first_token and (
             self._role == "reasoning" or self._role == "tool-call"
         ):
             self.display = True
 
         self._text += token
         self.query_one(".chat-message-label", Markdown).update(self._text)
+
+        if is_first_token:
+            self.query_one(ContentSwitcher).current = "chat-message-content"
 
     def update_border_subtitle(self, subtitle: str) -> None:
         """

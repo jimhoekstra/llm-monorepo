@@ -33,3 +33,12 @@
     scrollbar-visibility: hidden;
     overflow-y: auto;
 }
+
+#file-tree {
+    width: 1fr;
+    height: 1fr;
+    padding: 1;
+    border: round $panel;
+    background: transparent;
+    scrollbar-visibility: hidden;
+}

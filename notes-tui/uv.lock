@@ -189,6 +189,26 @@ wheels = [
 ]
 
 [[package]]
+name = "chat-tui"
+version = "0.1.0"
+source = { editable = "../chat-tui" }
+dependencies = [
+    { name = "local-llm" },
+    { name = "textual", extra = ["syntax"] },
+    { name = "textual-dev" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "local-llm", editable = "../local-llm" },
+    { name = "textual", extras = ["syntax"], specifier = ">=8.2.3" },
+    { name = "textual-dev", specifier = ">=1.8.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.15.10" }]
+
+[[package]]
 name = "click"
 version = "8.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -550,6 +570,7 @@ name = "notes-tui"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "chat-tui" },
     { name = "local-llm" },
     { name = "textual", extra = ["syntax"] },
     { name = "textual-dev" },
@@ -562,6 +583,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "chat-tui", editable = "../chat-tui" },
     { name = "local-llm", editable = "../local-llm" },
     { name = "textual", extras = ["syntax"], specifier = ">=8.2.3" },
     { name = "textual-dev", specifier = ">=1.8.0" },

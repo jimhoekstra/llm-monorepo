@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "chat-tui",
     "local-llm",
     "textual-dev>=1.8.0",
     "textual[syntax]>=8.2.3",
@@ -24,3 +25,4 @@ dev = [
 
 [tool.uv.sources]
 local-llm = { path = "../local-llm", editable = true }
+chat-tui = { path = "../chat-tui", editable = true }
