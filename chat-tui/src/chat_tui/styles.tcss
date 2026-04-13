@@ -1,0 +1,71 @@
+Screen {
+    align: center middle;
+}
+
+InputGroup {
+    dock: bottom;
+    height: 8;
+    
+    align-horizontal: center;
+}
+
+ChatHistory {
+    padding: 0 0 1 0;
+    scrollbar-visibility: hidden;
+    width: 80;
+}
+
+ChatMessage {
+    height: auto;
+    margin: 1 0 0 0;
+}
+
+ChatMessage .chat-message-label {
+    padding: 1 1 0 1;
+    background: transparent;
+}
+
+.chat-message-label-assistant {
+    border: round $secondary;
+}
+
+.chat-message-label-reasoning {
+    border: round $warning;
+    color: $text-muted;
+}
+
+.chat-message-label-tool-call {
+    border: round $success-darken-2;
+}
+
+.chat-message-label-user {
+    border: round $panel;
+}
+
+UserInput {
+    background: transparent;
+    border: round $panel;
+    margin: 0 1;
+    width: 80;
+}
+
+.tool-call-actions {
+    height: auto;
+    align-horizontal: right;
+}
+
+.tool-call-actions Button {
+    margin: 0 0 0 1;
+    min-width: 13;
+    background: transparent;
+}
+
+.tool-call-approve {
+    color: $text-success;
+    border: round $success;
+}
+
+.tool-call-reject {
+    color: $text-error;
+    border: round $error;
+}

@@ -1,0 +1,14 @@
+{
+    "python-envs.pythonProjects": [
+        {
+            "path": "chat-tui",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        },
+        {
+            "path": "local-llm",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ]
+}
