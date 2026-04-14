@@ -46,7 +46,7 @@ def call_llm(
 
 
 async def call_llm_async(
-    messages: list[Message | ToolCallResult], tools: list[dict] = []
+    messages: list[Message | ToolCallResult] | list[Message], tools: list[dict] = []
 ) -> AsyncIterator[UpdateSummary | Response]:
     """
     Call the LLM API asynchronously and stream back incremental updates followed by the final response.
@@ -83,7 +83,7 @@ async def call_llm_async(
 
 
 def _build_request_body(
-    messages: list[Message | ToolCallResult], tools: list[dict]
+    messages: list[Message | ToolCallResult] | list[Message], tools: list[dict]
 ) -> dict:
     """
     Build the request body to send to the LLM API.

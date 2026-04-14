@@ -1,4 +1,3 @@
-
 from textual.containers import ScrollableContainer
 
 from .chat_message import ChatMessage

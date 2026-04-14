@@ -1,7 +1,7 @@
 import asyncio
 
 from textual.app import ComposeResult
-from textual.widgets import Markdown, Button, ContentSwitcher, LoadingIndicator
+from textual.widgets import Markdown, Button, LoadingIndicator
 from textual.containers import Container, Horizontal
 from textual import on
 
@@ -204,7 +204,7 @@ class ToolCallChatMessage(ChatMessage):
     def call_tool_and_set_result(self) -> None:
         if self.tool_call is None:
             raise ValueError("No tool call to run.")
-    
+
         try:
             tool_call_result = self.tool_call.call()
             self.tool_call_result = tool_call_result
@@ -218,7 +218,6 @@ class ToolCallChatMessage(ChatMessage):
         finally:
             self._resolved.set()
             self._hide_buttons()
-
 
     @on(Button.Pressed, ".tool-call-approve")
     def tool_call_approved(self, event: Button.Pressed) -> None:
@@ -237,7 +236,7 @@ class ToolCallChatMessage(ChatMessage):
         """
         if self.tool_call is None:
             raise ValueError("No tool call to approve.")
-        
+
         return self.call_tool_and_set_result()
 
     @on(Button.Pressed, ".tool-call-reject")
@@ -279,12 +278,12 @@ class ToolCallChatMessage(ChatMessage):
         """
         if self.tool_call is None:
             raise ValueError("No tool call to wait for.")
-        
+
         if self.tool_call.requires_approval():
             await self._resolved.wait()
         else:
             self.call_tool_and_set_result()
-        
+
         if self.tool_call_result is None:
             raise ValueError("Tool call was not resolved properly.")
 

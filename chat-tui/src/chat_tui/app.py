@@ -20,18 +20,49 @@ from .user_input import UserInput, InputGroup
 
 
 @register_tool(
-    description="Get the current time in ISO format.", 
+    description="Get the current time in ISO format.",
     requires_approval=False,
 )
-def get_current_time() -> Annotated[str, Description("Information about the current timestamp in JSON format")]:
+def get_current_time() -> Annotated[
+    str, Description("Information about the current timestamp in JSON format")
+]:
+    """
+    Get the current UTC time as a JSON string.
+
+    Returns
+    -------
+    A JSON object containing the ISO timestamp and weekday name.
+    """
     now = datetime.now(timezone.utc)
 
-    date = {
-        "iso_timestamp": now.isoformat(),
-        "weekday": now.strftime("%A")
-    } 
+    date = {"iso_timestamp": now.isoformat(), "weekday": now.strftime("%A")}
 
     return json.dumps(date)
+
+
+@register_tool(
+    description="Count the number of words in a given text.",
+    requires_approval=True,
+)
+def count_words(
+    text: Annotated[str, Description("The text to count words in")],
+) -> Annotated[
+    str, Description("The number of words in the input text, returned in JSON format")
+]:
+    """
+    Count the number of words in a given text.
+
+    Parameters
+    ----------
+    text
+        The text to count words in.
+
+    Returns
+    -------
+    A JSON object containing the word count.
+    """
+    word_count = len(text.split())
+    return json.dumps({"word_count": word_count})
 
 
 class ChatApp(App):
@@ -41,7 +72,11 @@ class ChatApp(App):
     def on_mount(self) -> None:
         self.theme = "catppuccin-mocha"
         self.messages = [
-            build_system_prompt(prompt=(Path(__file__).resolve().parent / "prompts" / "system.md").read_text())
+            build_system_prompt(
+                prompt=(
+                    Path(__file__).resolve().parent / "prompts" / "system.md"
+                ).read_text()
+            )
         ]
 
     def on_user_input_submitted(self, message: UserInput.Submitted) -> None:
@@ -57,7 +92,7 @@ class ChatApp(App):
         while finish_reason not in {"stop"}:
             loading_message = LoadingIndicatorChatMessage()
             await chat_history.mount(loading_message)
-            
+
             reasoning_message = ChatMessage("", "reasoning")
             reasoning_message.display = False
             await chat_history.mount(reasoning_message)
@@ -74,7 +109,7 @@ class ChatApp(App):
 
             async for response in call_llm_async(
                 messages=self.messages, tools=load_tools()
-            ):  # type: ignore
+            ):
                 if isinstance(response, UpdateSummary):
                     if response.content is not None:
                         assistant_message.append_token(response.content)
@@ -87,13 +122,13 @@ class ChatApp(App):
                     if response.tool_calls is not None:
                         if not tool_calls_message.has_text():
                             tool_calls_message.append_token(
-                                f"Calling tool: `{response.tool_calls.name}`, with arguments:\n"
+                                f"Calling tool: `{response.tool_calls.name}`, with arguments:\n\n"
                             )
                             loading_message.dismiss()
 
                         if response.tool_calls.arguments is not None:
                             tool_calls_message.append_token(
-                                f"```json\n{response.tool_calls.arguments}\n```"
+                                response.tool_calls.arguments
                             )
 
                 elif isinstance(response, Response):

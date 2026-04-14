@@ -39,9 +39,9 @@ class NotesApp(App):
     async def add_welcome_message(self) -> None:
         sidebar = self.query_one("#sidebar", Vertical)
         chat_message = ChatMessage(
-                text="",
-                role="assistant",
-            )
+            text="",
+            role="assistant",
+        )
         sidebar.mount(chat_message)
 
         messages = [
@@ -55,13 +55,10 @@ class NotesApp(App):
             ),
         ]
 
-        async for response in call_llm_async(
-                messages=messages  # type: ignore
-            ):
-                if isinstance(response, UpdateSummary):
-                    if response.content is not None:
-                        chat_message.append_token(response.content)
-
+        async for response in call_llm_async(messages=messages):
+            if isinstance(response, UpdateSummary):
+                if response.content is not None:
+                    chat_message.append_token(response.content)
 
     def compose(self) -> ComposeResult:
         """
@@ -76,7 +73,7 @@ class NotesApp(App):
                 yield TextArea(language="markdown", id="editor")
                 yield Markdown(id="preview")
                 yield DirectoryTree("notes", id="file-tree")
-            
+
             yield Vertical(id="sidebar")
 
     async def on_text_area_changed(self, event: TextArea.Changed) -> None:
