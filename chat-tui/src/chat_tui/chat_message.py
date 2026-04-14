@@ -42,6 +42,7 @@ class ChatMessage(Container):
     .chat-message-label-reasoning {
         border: round $warning;
         color: $text-muted;
+        border-title-background: $warning-muted;
     }
 
     .chat-message-label-tool-call {
