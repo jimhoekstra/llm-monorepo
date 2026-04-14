@@ -180,24 +180,12 @@ class ToolCallChatMessage(ChatMessage):
         super().__init__(text, role)
         self._resolved = asyncio.Event()
 
-    def compose(self) -> ComposeResult:
-        """
-        Compose the tool call message with approve and reject buttons.
-
-        Returns
-        -------
-        The composed widgets for this tool call message.
-        """
-        for widget in super().compose():
-            yield widget
-
-        with Horizontal(classes="tool-call-actions"):
-            yield Button("Approve", classes="tool-call-approve")
-            yield Button("Reject", classes="tool-call-reject")
-
     def set_tool_call(self, tool_call: ToolCall) -> None:
         """
         Set the tool call associated with this message.
+
+        If the tool call requires approval, approve and reject buttons will be 
+        displayed.
 
         Parameters
         ----------
@@ -205,6 +193,15 @@ class ToolCallChatMessage(ChatMessage):
             The tool call to associate with this message.
         """
         self.tool_call = tool_call
+
+        if self.tool_call.requires_approval():
+            self.mount(
+                Horizontal(
+                    Button("Approve", classes="tool-call-approve"),
+                    Button("Reject", classes="tool-call-reject"),
+                    classes="tool-call-actions",
+                )
+            )
 
     def _hide_buttons(self) -> None:
         """
