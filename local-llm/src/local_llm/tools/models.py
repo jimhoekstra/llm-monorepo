@@ -16,6 +16,7 @@ class Tool(BaseModel):
     return_description: str
     arguments: list[ToolArgument]
     fn: Callable[..., str]
+    requires_approval: bool = False
 
     def to_json(self) -> dict:
         """

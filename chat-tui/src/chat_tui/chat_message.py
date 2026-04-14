@@ -67,23 +67,15 @@ class ChatMessage(Container):
         -------
         The composed widgets for this chat message.
         """
-        show_loading = self.display and not self.has_text()
-        initial = "loading-indicator" if show_loading else "chat-message-content"
-
         border_title = " ".join([word.capitalize() for word in self._role.split("-")])
 
-        with ContentSwitcher(initial=initial):
-            loading = LoadingIndicator(id="loading-indicator")
-            loading.border_title = border_title
-            yield loading
-
-            label = Markdown(
-                self._text,
-                classes=f"chat-message-label chat-message-label-{self._role}",
-                id="chat-message-content",
-            )
-            label.border_title = border_title
-            yield label
+        label = Markdown(
+            self._text,
+            classes=f"chat-message-label chat-message-label-{self._role}",
+            id="chat-message-content",
+        )
+        label.border_title = border_title
+        yield label
 
     def has_text(self) -> bool:
         """
@@ -106,16 +98,11 @@ class ChatMessage(Container):
         """
         is_first_token = not self.has_text()
 
-        if is_first_token and (
-            self._role == "reasoning" or self._role == "tool-call"
-        ):
+        if is_first_token:
             self.display = True
 
         self._text += token
         self.query_one(".chat-message-label", Markdown).update(self._text)
-
-        if is_first_token:
-            self.query_one(ContentSwitcher).current = "chat-message-content"
 
     def update_border_subtitle(self, subtitle: str) -> None:
         """
@@ -144,6 +131,33 @@ class ChatMessage(Container):
             f"- Out: {usage.completion_tokens} tokens ({int(timings.predicted_per_second)}/s) "
             f"- Total: {usage.total_tokens} tokens"
         )
+
+
+class LoadingIndicatorChatMessage(ChatMessage):
+    def __init__(self) -> None:
+        """
+        Create a loading indicator chat message.
+        """
+        super().__init__("", "loading")
+
+    def compose(self) -> ComposeResult:
+        """
+        Compose the loading indicator widget.
+
+        Returns
+        -------
+        The composed widgets for this loading indicator message.
+        """
+        border_title = " ".join([word.capitalize() for word in self._role.split("-")])
+        loading = LoadingIndicator(id="loading-indicator")
+        loading.border_title = border_title
+        yield loading
+
+    def dismiss(self) -> None:
+        """
+        Remove this message from the chat history.
+        """
+        self.remove()
 
 
 class ToolCallChatMessage(ChatMessage):
@@ -187,6 +201,25 @@ class ToolCallChatMessage(ChatMessage):
         for button in self.query(".tool-call-actions Button"):
             button.display = False
 
+    def call_tool_and_set_result(self) -> None:
+        if self.tool_call is None:
+            raise ValueError("No tool call to run.")
+    
+        try:
+            tool_call_result = self.tool_call.call()
+            self.tool_call_result = tool_call_result
+            self.append_token(
+                f"\n## Tool call approved. Result:\n\n{tool_call_result.content}"
+            )
+        except ValueError:
+            self.append_token(
+                "\n\nTool call failed due to invalid arguments or other error."
+            )
+        finally:
+            self._resolved.set()
+            self._hide_buttons()
+
+
     @on(Button.Pressed, ".tool-call-approve")
     def tool_call_approved(self, event: Button.Pressed) -> None:
         """
@@ -204,20 +237,8 @@ class ToolCallChatMessage(ChatMessage):
         """
         if self.tool_call is None:
             raise ValueError("No tool call to approve.")
-
-        try:
-            tool_call_result = self.tool_call.call()
-            self.tool_call_result = tool_call_result
-            self.append_token(
-                f"\n## Tool call approved. Result:\n\n{tool_call_result.content}"
-            )
-        except ValueError:
-            self.append_token(
-                "\n\nTool call failed due to invalid arguments or other error."
-            )
-        finally:
-            self._resolved.set()
-            self._hide_buttons()
+        
+        return self.call_tool_and_set_result()
 
     @on(Button.Pressed, ".tool-call-reject")
     def tool_call_rejected(self, event: Button.Pressed) -> None:
@@ -256,7 +277,14 @@ class ToolCallChatMessage(ChatMessage):
         ValueError
             When the tool call was not resolved properly.
         """
-        await self._resolved.wait()
+        if self.tool_call is None:
+            raise ValueError("No tool call to wait for.")
+        
+        if self.tool_call.requires_approval():
+            await self._resolved.wait()
+        else:
+            self.call_tool_and_set_result()
+        
         if self.tool_call_result is None:
             raise ValueError("Tool call was not resolved properly.")
 

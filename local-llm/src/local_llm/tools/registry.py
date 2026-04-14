@@ -14,7 +14,7 @@ PYTHON_TO_JSON_TYPE_MAP: dict[type, str] = {
 TOOL_REGISTRY: dict[str, Tool] = {}
 
 
-def register_tool(description: str) -> Callable[[Callable[..., str]], Callable[..., str]]:
+def register_tool(description: str, requires_approval: bool = True) -> Callable[[Callable[..., str]], Callable[..., str]]:
     """
     Decorator to register a function as a tool.
 
@@ -41,6 +41,7 @@ def register_tool(description: str) -> Callable[[Callable[..., str]], Callable[.
             return_description=_get_function_return_description(fn),
             arguments=_get_function_signature(fn),
             fn=fn,
+            requires_approval=requires_approval,
         )
 
         TOOL_REGISTRY[tool_name] = tool

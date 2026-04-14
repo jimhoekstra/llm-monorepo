@@ -1,4 +1,7 @@
 from pathlib import Path
+from datetime import datetime, timezone
+from typing import Annotated
+import json
 
 from textual.app import App, ComposeResult
 from textual import work
@@ -9,11 +12,26 @@ from local_llm.response.models import (
     UpdateSummary,
     Message,
 )
-from local_llm.tools import ToolCallResult, load_tools
+from local_llm.tools import ToolCallResult, load_tools, register_tool, Description
 
 from .chat_history import ChatHistory
-from .chat_message import ChatMessage, ToolCallChatMessage
+from .chat_message import ChatMessage, ToolCallChatMessage, LoadingIndicatorChatMessage
 from .user_input import UserInput, InputGroup
+
+
+@register_tool(
+    description="Get the current time in ISO format.", 
+    requires_approval=False,
+)
+def get_current_time() -> Annotated[str, Description("Information about the current timestamp in JSON format")]:
+    now = datetime.now(timezone.utc)
+
+    date = {
+        "iso_timestamp": now.isoformat(),
+        "weekday": now.strftime("%A")
+    } 
+
+    return json.dumps(date)
 
 
 class ChatApp(App):
@@ -37,11 +55,15 @@ class ChatApp(App):
         finish_reason = None
 
         while finish_reason not in {"stop"}:
+            loading_message = LoadingIndicatorChatMessage()
+            await chat_history.mount(loading_message)
+            
             reasoning_message = ChatMessage("", "reasoning")
             reasoning_message.display = False
             await chat_history.mount(reasoning_message)
 
             assistant_message = ChatMessage("", "assistant")
+            assistant_message.display = False
             await chat_history.mount(assistant_message)
 
             tool_calls_message = ToolCallChatMessage("", "tool-call")
@@ -56,15 +78,18 @@ class ChatApp(App):
                 if isinstance(response, UpdateSummary):
                     if response.content is not None:
                         assistant_message.append_token(response.content)
+                        loading_message.dismiss()
 
                     if response.reasoning_content is not None:
                         reasoning_message.append_token(response.reasoning_content)
+                        loading_message.dismiss()
 
                     if response.tool_calls is not None:
                         if not tool_calls_message.has_text():
                             tool_calls_message.append_token(
                                 f"Calling tool: `{response.tool_calls.name}`, with arguments:\n"
                             )
+                            loading_message.dismiss()
 
                         if response.tool_calls.arguments is not None:
                             tool_calls_message.append_token(

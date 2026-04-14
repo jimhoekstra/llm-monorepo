@@ -2,7 +2,7 @@ import json
 
 from pydantic import BaseModel
 
-from local_llm.tools.call import call_tool, ToolCallResult
+from local_llm.tools.call import call_tool, ToolCallResult, tool_requires_approval
 
 
 class ToolCallUpdate(BaseModel):
@@ -98,6 +98,12 @@ class ToolCall(BaseModel):
             name=self.function.name,
             arguments=tool_call.function.arguments,
         )
+    
+    def requires_approval(self) -> bool:
+        if self.function is None:
+            return True
+        
+        return tool_requires_approval(self.function.name)
     
     def call(self) -> ToolCallResult:
         if self.function is None:

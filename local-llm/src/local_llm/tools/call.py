@@ -2,6 +2,30 @@ from .registry import TOOL_REGISTRY
 from .models import ToolCallResult
 
 
+def tool_requires_approval(name: str) -> bool:
+    """
+    Check if a tool requires approval.
+
+    Parameters
+    ----------
+    name
+        The name of the tool to check.
+
+    Returns
+    -------
+    True if the tool requires approval, False otherwise.
+
+    Raises
+    ------
+    ValueError
+        If no tool with the given name is registered.
+    """
+    if name not in TOOL_REGISTRY:
+        raise ValueError(f"No tool registered with name '{name}'.")
+
+    return TOOL_REGISTRY[name].requires_approval
+
+
 def call_tool(name: str, args: dict, tool_call_id: str) -> ToolCallResult:
     """
     Call a registered tool by name with the given arguments.

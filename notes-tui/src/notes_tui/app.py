@@ -6,7 +6,7 @@ from textual import work
 
 from chat_tui.chat_message import ChatMessage
 from local_llm.request.request import call_llm_async
-from local_llm.request.message import build_system_prompt, build_user_prompt
+from local_llm.request.message import build_system_prompt
 from local_llm.response.models import UpdateSummary
 
 
