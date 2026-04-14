@@ -33,6 +33,10 @@ class ChatMessage(Container):
 
     .chat-message-label-assistant {
         border: round $secondary;
+        border-title-background: $secondary-muted;
+        
+        border-subtitle-color: $text-muted;
+        border-subtitle-background: $surface;
     }
 
     .chat-message-label-reasoning {
@@ -42,10 +46,17 @@ class ChatMessage(Container):
 
     .chat-message-label-tool-call {
         border: round $success-darken-2;
+        border-title-background: $success-muted;
+        
+        border-subtitle-color: $text-muted;
+        border-subtitle-background: $surface;
     }
 
     .chat-message-label-user {
         border: round $panel;
+        border-title-color: $text-muted;
+        border-title-background: $surface;
+        
     }
 
     #loading-indicator {
@@ -127,9 +138,9 @@ class ChatMessage(Container):
             Timing statistics for prompt and prediction.
         """
         self.update_border_subtitle(
-            f"In: {usage.prompt_tokens} tokens ({int(timings.prompt_per_second)}/s) "
-            f"- Out: {usage.completion_tokens} tokens ({int(timings.predicted_per_second)}/s) "
-            f"- Total: {usage.total_tokens} tokens"
+            f"In: {usage.prompt_tokens} ({int(timings.prompt_per_second)}/s - {timings.cache_n} cached) "
+            f"- Out: {usage.completion_tokens} ({int(timings.predicted_per_second)}/s) "
+            f"- Total: {usage.total_tokens}"
         )
 
 

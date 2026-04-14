@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Annotated
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import json
 
 from textual.app import App, ComposeResult
@@ -20,11 +21,17 @@ from .user_input import UserInput, InputGroup
 
 
 @register_tool(
-    description="Get the current time in ISO format.",
+    description=(
+        "Get the current time using UTC timezone in ISO format, and the day of the week. "
+        "Use this tool when the assistant needs to know the current time, keep in mind that "
+        "the resulting timestamp might need to be converted to a different timezone using the "
+        "`convert_timezone` tool if the user is asking for the current time in a specific region "
+        "or city."
+    ),
     requires_approval=False,
 )
 def get_current_time() -> Annotated[
-    str, Description("Information about the current timestamp in JSON format")
+    str, Description("Information about the current timestamp using UTC timezone and the day of the week in JSON format")
 ]:
     """
     Get the current UTC time as a JSON string.
@@ -41,28 +48,52 @@ def get_current_time() -> Annotated[
 
 
 @register_tool(
-    description="Count the number of words in a given text.",
-    requires_approval=True,
+    description=(
+        "Convert a datetime from one time zone to another. Use this tool when the assistant "
+        "needs to convert a datetime between time zones, or use this tool after getting the "
+        "current time in UTC if the user asks for the current time in a specific region or city."
+    ),
+    requires_approval=False,
 )
-def count_words(
-    text: Annotated[str, Description("The text to count words in")],
-) -> Annotated[
-    str, Description("The number of words in the input text, returned in JSON format")
-]:
+def convert_timezone(
+    iso_timestamp: Annotated[str, Description("The datetime to convert, in ISO 8601 format")],
+    from_tz: Annotated[str, Description("The IANA time zone name of the input datetime, e.g. 'America/New_York'")],
+    to_tz: Annotated[str, Description("The IANA time zone name to convert to, e.g. 'Europe/London'")],
+) -> Annotated[str, Description("The converted datetime in ISO 8601 format, returned in JSON format")]:
     """
-    Count the number of words in a given text.
+    Convert a datetime from one time zone to another.
 
     Parameters
     ----------
-    text
-        The text to count words in.
+    iso_timestamp
+        The datetime to convert, in ISO 8601 format.
+    from_tz
+        The IANA time zone name of the input datetime, e.g. "America/New_York".
+    to_tz
+        The IANA time zone name to convert to, e.g. "Europe/London".
 
     Returns
     -------
-    A JSON object containing the word count.
+    A JSON object containing the converted ISO timestamp and the target time zone name.
+
+    Raises
+    ------
+    ValueError
+        When either time zone name is invalid or the timestamp cannot be parsed.
     """
-    word_count = len(text.split())
-    return json.dumps({"word_count": word_count})
+    try:
+        source_zone = ZoneInfo(from_tz)
+        target_zone = ZoneInfo(to_tz)
+    except ZoneInfoNotFoundError as e:
+        raise ValueError(f"Unknown time zone: {e}") from e
+
+    try:
+        dt = datetime.fromisoformat(iso_timestamp).replace(tzinfo=source_zone)
+    except ValueError as e:
+        raise ValueError(f"Invalid ISO timestamp: {e}") from e
+
+    converted = dt.astimezone(target_zone)
+    return json.dumps({"iso_timestamp": converted.isoformat(), "timezone": to_tz})
 
 
 class ChatApp(App):
@@ -105,6 +136,8 @@ class ChatApp(App):
             tool_calls_message.display = False
             await chat_history.mount(tool_calls_message)
 
+            last_updated_message = None
+
             chat_history.scroll_end(animate=False)
 
             async for response in call_llm_async(
@@ -113,13 +146,16 @@ class ChatApp(App):
                 if isinstance(response, UpdateSummary):
                     if response.content is not None:
                         assistant_message.append_token(response.content)
+                        last_updated_message = assistant_message
                         loading_message.dismiss()
 
                     if response.reasoning_content is not None:
                         reasoning_message.append_token(response.reasoning_content)
+                        last_updated_message = reasoning_message
                         loading_message.dismiss()
 
                     if response.tool_calls is not None:
+                        last_updated_message = tool_calls_message
                         if not tool_calls_message.has_text():
                             tool_calls_message.append_token(
                                 f"Calling tool: `{response.tool_calls.name}`, with arguments:\n\n"
@@ -132,8 +168,8 @@ class ChatApp(App):
                             )
 
                 elif isinstance(response, Response):
-                    if response.usage is not None and response.timings is not None:
-                        assistant_message.update_usage(response.usage, response.timings)
+                    if response.usage is not None and response.timings is not None and last_updated_message is not None:
+                        last_updated_message.update_usage(response.usage, response.timings)
 
                     self.messages.append(response.get_message())
                     finish_reason = response.get_finish_reason()
