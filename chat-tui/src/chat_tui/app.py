@@ -53,7 +53,7 @@ def get_current_time() -> Annotated[
         "needs to convert a datetime between time zones, or use this tool after getting the "
         "current time in UTC if the user asks for the current time in a specific region or city."
     ),
-    requires_approval=False,
+    requires_approval=True,
 )
 def convert_timezone(
     iso_timestamp: Annotated[str, Description("The datetime to convert, in ISO 8601 format")],
@@ -207,7 +207,8 @@ class ChatApp(App):
                     finish_reason = response.get_finish_reason()
 
                     if (tool_call := response.has_tool_request()) is not None:
-                        tool_calls_message.set_tool_call(tool_call)
+                        await tool_calls_message.set_tool_call(tool_call)
+                        chat_history.scroll_end_if_autoscroll()
 
                         if (
                             tool_call_result

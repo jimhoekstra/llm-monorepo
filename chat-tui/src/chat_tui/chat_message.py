@@ -180,7 +180,7 @@ class ToolCallChatMessage(ChatMessage):
         super().__init__(text, role)
         self._resolved = asyncio.Event()
 
-    def set_tool_call(self, tool_call: ToolCall) -> None:
+    async def set_tool_call(self, tool_call: ToolCall) -> None:
         """
         Set the tool call associated with this message.
 
@@ -195,7 +195,7 @@ class ToolCallChatMessage(ChatMessage):
         self.tool_call = tool_call
 
         if self.tool_call.requires_approval():
-            self.mount(
+            await self.mount(
                 Horizontal(
                     Button("Approve", classes="tool-call-approve"),
                     Button("Reject", classes="tool-call-reject"),
