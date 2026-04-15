@@ -139,8 +139,8 @@ class ChatMessage(Container):
             Timing statistics for prompt and prediction.
         """
         self.update_border_subtitle(
-            f"In: {usage.prompt_tokens} ({int(timings.prompt_per_second)}/s - {timings.cache_n} cached) "
-            f"- Out: {usage.completion_tokens} ({int(timings.predicted_per_second)}/s) "
+            f"In: {usage.prompt_tokens} ({timings.prompt_per_second:.1f}/s - {timings.cache_n} cached) "
+            f"- Out: {usage.completion_tokens} ({timings.predicted_per_second:.1f}/s) "
             f"- Total: {usage.total_tokens}"
         )
 
