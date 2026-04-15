@@ -9,7 +9,6 @@ InputGroup {
 }
 
 ChatHistory {
-    padding: 0 0 1 0;
     scrollbar-visibility: hidden;
     width: 80;
 }

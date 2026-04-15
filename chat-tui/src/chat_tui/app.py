@@ -97,10 +97,20 @@ def convert_timezone(
 
 
 class ChatApp(App):
+    """
+    Textual TUI application for chatting with an LLM.
+    """
+
     CSS_PATH = "styles.tcss"
     messages: list[Message | ToolCallResult]
 
     def on_mount(self) -> None:
+        """
+        Initialize the application after mounting.
+
+        Sets the theme, focuses the user input widget, and seeds the
+        message history with the system prompt.
+        """
         self.theme = "catppuccin-mocha"
         self.query_one(UserInput).focus()
         self.messages = [
@@ -112,10 +122,31 @@ class ChatApp(App):
         ]
 
     def on_user_input_submitted(self, message: UserInput.Submitted) -> None:
+        """
+        Handle a user input submission event.
+
+        Parameters
+        ----------
+        message
+            The submission event containing the user's text.
+        """
         self.stream_reply(message.text)
 
     @work
     async def stream_reply(self, user_text: str) -> None:
+        """
+        Stream a reply from the LLM in response to user input.
+
+        Appends the user message to history, then iterates through LLM
+        responses until a stop signal is received. Handles streaming text,
+        reasoning tokens, and tool calls, updating the chat history UI
+        as tokens arrive.
+
+        Parameters
+        ----------
+        user_text
+            The message text submitted by the user.
+        """
         chat_history = self.query_one(ChatHistory)
 
         self.messages.append(build_user_prompt(user_text))
@@ -187,5 +218,12 @@ class ChatApp(App):
                 chat_history.scroll_end_if_autoscroll()
 
     def compose(self) -> ComposeResult:
+        """
+        Build the widget tree for the application.
+
+        Returns
+        -------
+        The composed widgets: a ChatHistory and an InputGroup.
+        """
         yield ChatHistory()
         yield InputGroup()
