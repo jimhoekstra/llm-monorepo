@@ -7,17 +7,27 @@
     height: 1fr;
 }
 
-#main {
+#main-column {
+    height: 1fr;
     padding: 1;
+}
+
+#filename {
+    width: 1fr;
+    border: round $panel;
+    background: transparent;
+}
+
+#main {
+    height: 1fr;
 }
 
 #editor {
     width: 1fr;
     height: 1fr;
-    padding: 1;
+    padding: 1 0 1 1;
     border: round $secondary;
     background: transparent;
-    scrollbar-visibility: hidden;
 }
 
 #editor:focus {
@@ -27,11 +37,13 @@
 #preview {
     width: 1fr;
     height: 1fr;
-    padding: 1;
+    padding: 1 0 1 1;
     border: round $panel;
     background: transparent;
-    scrollbar-visibility: hidden;
-    overflow-y: auto;
+}
+
+#preview-md {
+    background: transparent;
 }
 
 #file-tree {

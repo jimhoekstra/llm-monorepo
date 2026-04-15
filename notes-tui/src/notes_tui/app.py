@@ -1,7 +1,9 @@
+from pathlib import Path
+
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import ContentSwitcher, Markdown, TextArea, DirectoryTree
-from textual.containers import Horizontal, Vertical
+from textual.widgets import ContentSwitcher, Input, Markdown, TextArea, DirectoryTree
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual import work
 
 from chat_tui.chat_message import ChatMessage
@@ -19,18 +21,24 @@ class NotesApp(App):
 
     BINDINGS = [
         Binding("ctrl+s", "save", "Save"),
-        Binding("ctrl+d", "toggle_preview", "View Preview", priority=True),
-        Binding("ctrl+f", "toggle_files", "Browse Files", priority=True),
+        Binding("ctrl+n", "new_note", "New Note"),
+        Binding("ctrl+r", "focus_filename", "Rename"),
+        Binding("ctrl+e", "show_editor", "Edit", priority=True),
+        Binding("ctrl+d", "show_preview", "View Preview", priority=True),
+        Binding("ctrl+f", "show_files", "Browse Files", priority=True),
         Binding("ctrl+q", "quit", "Quit"),
     ]
+
+    _current_path: Path | None = None
 
     async def on_mount(self) -> None:
         """
         Set the theme and widget border titles on startup.
         """
         self.theme = "catppuccin-mocha"
+        self.query_one("#filename", Input).border_title = "Filename"
         self.query_one("#editor", TextArea).border_title = "Editor"
-        self.query_one("#preview", Markdown).border_title = "Preview"
+        self.query_one("#preview", VerticalScroll).border_title = "Preview"
         self.query_one("#file-tree", DirectoryTree).border_title = "Files"
 
         self.add_welcome_message()
@@ -69,10 +77,13 @@ class NotesApp(App):
         The composed widgets for the application.
         """
         with Horizontal(id="columns"):
-            with ContentSwitcher(initial="editor", id="main"):
-                yield TextArea(language="markdown", id="editor")
-                yield Markdown(id="preview")
-                yield DirectoryTree("notes", id="file-tree")
+            with Vertical(id="main-column"):
+                yield Input(placeholder="untitled.md", id="filename")
+                with ContentSwitcher(initial="editor", id="main"):
+                    yield TextArea(language="markdown", id="editor")
+                    with VerticalScroll(id="preview"):
+                        yield Markdown(id="preview-md")
+                    yield DirectoryTree("notes", id="file-tree")
 
             yield Vertical(id="sidebar")
 
@@ -85,37 +96,98 @@ class NotesApp(App):
         event
             The change event from the TextArea.
         """
-        preview = self.query_one("#preview", Markdown)
+        preview = self.query_one("#preview-md", Markdown)
         await preview.update(event.text_area.text)
 
-    def action_toggle_preview(self) -> None:
+    def action_show_editor(self) -> None:
         """
-        Toggle between the editor and the markdown preview.
+        Show the editor and focus it.
         """
-        switcher = self.query_one("#main", ContentSwitcher)
-        if switcher.current == "editor":
-            switcher.current = "preview"
-        else:
-            switcher.current = "editor"
-            self.query_one("#editor", TextArea).focus()
+        self.query_one("#main", ContentSwitcher).current = "editor"
+        self.query_one("#editor", TextArea).focus()
 
-    def action_toggle_files(self) -> None:
+    def action_show_preview(self) -> None:
         """
-        Toggle the file browser, showing the notes directory tree.
+        Show the markdown preview and focus it.
         """
+        self.query_one("#main", ContentSwitcher).current = "preview"
+        self.query_one("#preview", VerticalScroll).focus()
+
+    def action_show_files(self) -> None:
+        """
+        Show the file browser and focus it.
+        """
+        self.query_one("#main", ContentSwitcher).current = "file-tree"
+        self.query_one("#file-tree", DirectoryTree).focus()
+
+    def action_new_note(self) -> None:
+        """
+        Clear the editor and filename input to start a new note.
+        """
+        self._current_path = None
+        self.query_one("#filename", Input).value = ""
+        self.query_one("#editor", TextArea).load_text("")
+
         switcher = self.query_one("#main", ContentSwitcher)
-        if switcher.current == "file-tree":
-            switcher.current = "editor"
-            self.query_one("#editor", TextArea).focus()
-        else:
-            switcher.current = "file-tree"
-            self.query_one("#file-tree", DirectoryTree).focus()
+        switcher.current = "editor"
+        
+        self.query_one("#editor", TextArea).focus()
+
+    def action_focus_filename(self) -> None:
+        """
+        Focus the filename input.
+        """
+        self.query_one("#filename", Input).focus()
+
+    async def on_directory_tree_file_selected(
+        self, event: DirectoryTree.FileSelected
+    ) -> None:
+        """
+        Load the selected file into the editor and switch to the preview.
+
+        Parameters
+        ----------
+        event
+            The file selection event from the DirectoryTree.
+        """
+        self._current_path = event.path
+        self.query_one("#filename", Input).value = event.path.name
+
+        content = event.path.read_text()
+        self.query_one("#editor", TextArea).load_text(content)
+
+        await self.query_one("#preview-md", Markdown).update(content)
+
+        switcher = self.query_one("#main", ContentSwitcher)
+        switcher.current = "preview"
+
+        self.query_one("#preview", VerticalScroll).focus()
 
     def action_save(self) -> None:
         """
-        Save the current note content to note.md in the working directory.
+        Save the current editor content to the file named in the filename input.
+
+        If the filename has changed from the currently open file, the file is
+        renamed before writing. New notes with no existing path are saved into
+        the notes/ directory.
         """
-        # TODO: Implement file saving logic
-        # editor = self.query_one("#editor", TextArea)
-        # Path("note.md").write_text(editor.text)
-        self.notify("Saved note!")
+        filename = self.query_one("#filename", Input).value.strip()
+        if not filename:
+            self.notify("Please enter a filename.", severity="error")
+            return
+
+        content = self.query_one("#editor", TextArea).text
+
+        if self._current_path is not None:
+            if self._current_path.name != filename:
+                new_path = self._current_path.parent / filename
+                self._current_path.rename(new_path)
+                self._current_path = new_path
+            self._current_path.write_text(content)
+        
+        else:
+            save_path = Path("notes") / filename
+            save_path.write_text(content)
+            self._current_path = save_path
+
+        self.notify(f"Saved {self._current_path.name}!")
