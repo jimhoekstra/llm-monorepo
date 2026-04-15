@@ -102,6 +102,7 @@ class ChatApp(App):
 
     def on_mount(self) -> None:
         self.theme = "catppuccin-mocha"
+        self.query_one(UserInput).focus()
         self.messages = [
             build_system_prompt(
                 prompt=(
