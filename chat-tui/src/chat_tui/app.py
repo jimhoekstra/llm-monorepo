@@ -7,16 +7,14 @@ import json
 from textual.app import App, ComposeResult
 from textual import work
 
-from local_llm.request import call_llm_async, build_system_prompt, build_user_prompt
+from local_llm.request import build_system_prompt, build_user_prompt, LLMRequestQueue
 from local_llm.response.models import (
-    Response,
-    UpdateSummary,
     Message,
 )
 from local_llm.tools import ToolCallResult, load_tools, register_tool, Description
 
 from .chat_history import ChatHistory
-from .chat_message import ChatMessage, ToolCallChatMessage, LoadingIndicatorChatMessage
+from .chat_message import ChatMessage, ToolCallChatMessage
 from .user_input import UserInput, InputGroup
 
 
@@ -53,7 +51,7 @@ def get_current_time() -> Annotated[
         "needs to convert a datetime between time zones, or use this tool after getting the "
         "current time in UTC if the user asks for the current time in a specific region or city."
     ),
-    requires_approval=True,
+    requires_approval=False,
 )
 def convert_timezone(
     iso_timestamp: Annotated[str, Description("The datetime to convert, in ISO 8601 format")],
@@ -103,13 +101,14 @@ class ChatApp(App):
 
     CSS_PATH = "styles.tcss"
     messages: list[Message | ToolCallResult]
+    _request_queue: LLMRequestQueue
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         """
         Initialize the application after mounting.
 
-        Sets the theme, focuses the user input widget, and seeds the
-        message history with the system prompt.
+        Sets the theme, focuses the user input widget, seeds the message
+        history with the system prompt, and opens the shared HTTP session.
         """
         self.theme = "catppuccin-mocha"
         self.query_one(UserInput).focus()
@@ -120,6 +119,15 @@ class ChatApp(App):
                 ).read_text()
             )
         ]
+        self._request_queue = LLMRequestQueue()
+
+    async def on_unmount(self) -> None:
+        """
+        Tear down the application.
+
+        Closes the shared HTTP session opened by the request queue.
+        """
+        await self._request_queue.close()
 
     def on_user_input_submitted(self, message: UserInput.Submitted) -> None:
         """
@@ -152,71 +160,86 @@ class ChatApp(App):
         self.messages.append(build_user_prompt(user_text))
         finish_reason = None
 
+        collected_chat_messages = []
+        def mark_messages_as_complete():
+            for message in collected_chat_messages:
+                message.mark_complete()
+
         while finish_reason not in {"stop"}:
-            loading_message = LoadingIndicatorChatMessage()
-            await chat_history.mount(loading_message)
+            reasoning_message: ChatMessage | None = None
+            assistant_message: ChatMessage | None = None
+            tool_calls_message: ToolCallChatMessage | None = None
 
-            reasoning_message = ChatMessage("", "reasoning")
-            reasoning_message.display = False
-            await chat_history.mount(reasoning_message)
+            key = self._request_queue.create_request(self.messages, load_tools())
 
-            assistant_message = ChatMessage("", "assistant")
-            assistant_message.display = False
-            await chat_history.mount(assistant_message)
+            async for update in self._request_queue.get_request(key):
+                self.query_one(InputGroup).mark_last_user_message_complete()
 
-            tool_calls_message = ToolCallChatMessage("", "tool-call")
-            tool_calls_message.display = False
-            await chat_history.mount(tool_calls_message)
+                if update.reasoning_content is not None:
+                    if reasoning_message is None:
+                        reasoning_message = ChatMessage("", "reasoning")
+                        await chat_history.mount(reasoning_message)
+                        mark_messages_as_complete()
+                        collected_chat_messages.append(reasoning_message)
+                        reasoning_message.mark_loading()
+                    
+                    reasoning_message.append_token(update.reasoning_content)
 
-            last_updated_message = None
+                if update.content is not None:
+                    if assistant_message is None:
+                        assistant_message = ChatMessage("", "assistant")
+                        await chat_history.mount(assistant_message)
+                        mark_messages_as_complete()
+                        collected_chat_messages.append(assistant_message)
+                        assistant_message.mark_loading()
+                    
+                    assistant_message.append_token(update.content)
 
-            chat_history.scroll_end(animate=False)
+                if update.tool_calls is not None:
+                    if tool_calls_message is None:
+                        tool_calls_message = ToolCallChatMessage("", "tool-call")
+                        await chat_history.mount(tool_calls_message)
+                        mark_messages_as_complete()
+                        collected_chat_messages.append(tool_calls_message)
+                        tool_calls_message.mark_loading()
+                    
+                    if not tool_calls_message.has_text():
+                        tool_calls_message.append_title(
+                            f": {update.tool_calls.name}"
+                        )
 
-            async for response in call_llm_async(
-                messages=self.messages, tools=load_tools()
-            ):
-                if isinstance(response, UpdateSummary):
-                    if response.content is not None:
-                        assistant_message.append_token(response.content)
-                        last_updated_message = assistant_message
-                        loading_message.dismiss()
+                        tool_calls_message.append_token(f"\n\nArgs:\n\n```json\n")
 
-                    if response.reasoning_content is not None:
-                        reasoning_message.append_token(response.reasoning_content)
-                        last_updated_message = reasoning_message
-                        loading_message.dismiss()
-
-                    if response.tool_calls is not None:
-                        last_updated_message = tool_calls_message
-                        if not tool_calls_message.has_text():
-                            tool_calls_message.append_token(
-                                f"Calling tool: `{response.tool_calls.name}`, with arguments:\n\n"
-                            )
-                            loading_message.dismiss()
-
-                        if response.tool_calls.arguments is not None:
-                            tool_calls_message.append_token(
-                                response.tool_calls.arguments
-                            )
-
-                elif isinstance(response, Response):
-                    if response.usage is not None and response.timings is not None and last_updated_message is not None:
-                        last_updated_message.update_usage(response.usage, response.timings)
-
-                    self.messages.append(response.get_message())
-                    finish_reason = response.get_finish_reason()
-
-                    if (tool_call := response.has_tool_request()) is not None:
-                        await tool_calls_message.set_tool_call(tool_call)
-                        chat_history.scroll_end_if_autoscroll()
-
-                        if (
-                            tool_call_result
-                            := await tool_calls_message.wait_for_result()
-                        ) is not None:
-                            self.messages.append(tool_call_result)
+                    if update.tool_calls.arguments is not None:
+                        tool_calls_message.append_token(
+                            update.tool_calls.arguments
+                        )
 
                 chat_history.scroll_end_if_autoscroll()
+
+            response = self._request_queue.get_request(key).response
+            assert response is not None
+            mark_messages_as_complete()
+
+            # if response.usage is not None and response.timings is not None and last_updated_message is not None:
+            #     last_updated_message.update_usage(response.usage, response.timings)
+
+            self.messages.append(response.get_message())
+            finish_reason = response.get_finish_reason()
+
+            if (tool_call := response.has_tool_request()) is not None:
+                assert tool_calls_message is not None
+                tool_calls_message.append_token(f"\n```")
+                await tool_calls_message.set_tool_call(tool_call)
+                chat_history.scroll_end_if_autoscroll()
+
+                if (
+                    tool_call_result
+                    := await tool_calls_message.wait_for_result()
+                ) is not None:
+                    self.messages.append(tool_call_result)
+
+            chat_history.scroll_end_if_autoscroll()
 
     def compose(self) -> ComposeResult:
         """

@@ -9,7 +9,7 @@ from textual import work
 from chat_tui.chat_message import ChatMessage
 from local_llm.request.request import call_llm_async
 from local_llm.request.message import build_system_prompt
-from local_llm.response.models import UpdateSummary
+from local_llm.response.models import UpdateSummary, Response
 
 
 class NotesApp(App):
@@ -50,6 +50,7 @@ class NotesApp(App):
             text="",
             role="assistant",
         )
+        chat_message.mark_loading()
         sidebar.mount(chat_message)
 
         messages = [
@@ -67,6 +68,8 @@ class NotesApp(App):
             if isinstance(response, UpdateSummary):
                 if response.content is not None:
                     chat_message.append_token(response.content)
+            if isinstance(response, Response):
+                chat_message.mark_complete()
 
     def compose(self) -> ComposeResult:
         """

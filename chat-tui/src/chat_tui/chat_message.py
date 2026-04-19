@@ -1,28 +1,62 @@
 import asyncio
+import time
 
 from textual.app import ComposeResult
-from textual.widgets import Markdown, Button, LoadingIndicator
+from textual.timer import Timer
+from textual.widgets import Markdown, Button, Collapsible
 from textual.containers import Container, Horizontal
 from textual import on
 
 from local_llm.response.models import (
-    TokenUsage,
-    Timings,
+    # TokenUsage,
+    # Timings,
     ToolCall,
 )
 from local_llm.tools import ToolCallResult
+
+
+_ROLE_TITLE_STYLE: dict[str, str] = {
+    "assistant": "#0088ff",
+    "reasoning": "#d7875f",
+    "user": "#8787ff",
+    "tool-call": "#5faf5f",
+}
+
+# _MUTED_ROLE_TITLE_STYLE: dict[str, str] = {
+#     "assistant": "#02559d",
+#     "reasoning": "#834B2F",
+#     "user": "#373785",
+#     "tool-call": "#285d28",
+# }
 
 
 class ChatMessage(Container):
     """A single chat message bubble."""
 
     DEFAULT_CSS = """
-    ChatMessage {
+    .chat-message-collapsible {
         height: auto;
-        margin: 1 0 0 0;
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        border-top: none;
     }
 
-    ChatMessage ContentSwitcher {
+    .chat-message-collapsible-assistant {
+        margin-top: 1;
+    }
+
+    .chat-message-collapsible-user {
+        margin-top: 1;
+    }
+
+    .chat-message-collapsible-title {
+        padding: 0;
+        margin: 0;
+    }
+
+    ChatMessage {
+        margin: 0;
         height: auto;
     }
 
@@ -31,33 +65,17 @@ class ChatMessage(Container):
         background: transparent;
     }
 
-    .chat-message-label-assistant {
-        border: round $secondary;
-        border-title-background: $secondary-muted;
-        
-        border-subtitle-color: $text-muted;
-        border-subtitle-background: $surface;
+    .chat-message-collapsible > Contents {
+        padding: 0;
+        height: auto;
     }
 
     .chat-message-label-reasoning {
-        border: round $warning;
         color: $text-muted;
-        border-title-background: $warning-muted;
     }
 
     .chat-message-label-tool-call {
-        border: round $success-darken-2;
-        border-title-background: $success-muted;
-        
-        border-subtitle-color: $text-muted;
-        border-subtitle-background: $surface;
-    }
-
-    .chat-message-label-user {
-        border: round $panel;
-        border-title-color: $text-muted;
-        border-title-background: $surface;
-        
+        color: $success-darken-3;
     }
 
     #loading-indicator {
@@ -67,9 +85,18 @@ class ChatMessage(Container):
     """
 
     def __init__(self, text: str, role: str) -> None:
-        super().__init__(classes=f"chat-message-{role}")
+        super().__init__(classes=f"chat-message chat-message-{role}")
         self._text = text
         self._role = role
+        self._is_complete = False
+
+        self._start_time: float = 0.0
+        self._elapsed_time: float = 0.0
+        self._loading_timer: Timer | None = None
+
+        self._is_default_collapsed = role in ("reasoning", "tool-call")
+        self._title_text = " ".join([word.capitalize() for word in self._role.split("-")])
+        self._title_suffix = ""
 
     def compose(self) -> ComposeResult:
         """
@@ -79,16 +106,73 @@ class ChatMessage(Container):
         -------
         The composed widgets for this chat message.
         """
-        border_title = " ".join([word.capitalize() for word in self._role.split("-")])
-
         label = Markdown(
             self._text,
             classes=f"chat-message-label chat-message-label-{self._role}",
             id="chat-message-content",
         )
-        label.border_title = border_title
-        yield label
+        
+        yield Collapsible(
+            label,
+            title=self._styled_title(),
+            classes=f"chat-message-collapsible chat-message-collapsible-{self._role}",
+            collapsed=self._is_default_collapsed,
+        )
 
+    def _styled_title(self) -> str:
+        """
+        Compute the title with color and underline based on collapsed state.
+
+        Returns
+        -------
+        The Rich-markup-styled title string.
+        """
+        style = _ROLE_TITLE_STYLE.get(self._role, "")
+        title = f"[{style}]{self._title_text}[/{style}]" if style else self._title_text
+
+        return f"{title}{self._title_suffix}"
+
+    @on(Collapsible.Collapsed, ".chat-message-collapsible")
+    def _collapsed(self, event: Collapsible.Toggled) -> None:
+        """
+        Update the title style and margin when the collapsible is collapsed.
+        """
+        event.collapsible.styles.margin = (0, 0, 0, 0)
+
+    @on(Collapsible.Expanded, ".chat-message-collapsible")
+    def _expanded(self, event: Collapsible.Toggled) -> None:
+        """
+        Update the title style and margin when the collapsible is expanded.
+        """
+        event.collapsible.styles.margin = (1, 0, 0, 0)
+
+    def mark_loading(self) -> None:
+        """
+        Start the loading animation and elapsed time display or proceed if already started.
+        """
+        if self._loading_timer is None or self._is_complete:
+            self._is_complete = False
+            self._start_time = time.monotonic()
+            self._loading_timer = self.set_interval(0.1, self._animate_loading)
+
+    def _animate_loading(self) -> None:
+        """
+        Update the title with the elapsed time in seconds.
+        """
+        self._elapsed_time = time.monotonic() - self._start_time
+        collapsible = self.query_one(".chat-message-collapsible", Collapsible)
+        collapsible.title = f"{self._styled_title()} [dim]{self._elapsed_time:.1f}s[/dim]"
+
+    def mark_complete(self) -> None:
+        """
+        Stop the loading animation and restore the plain title.
+        """
+        self._is_complete = True
+        if self._loading_timer is not None:
+            self._loading_timer.stop()
+            self._loading_timer = None
+            self._animate_loading()
+        
     def has_text(self) -> bool:
         """
         Check whether this message contains non-whitespace text.
@@ -98,6 +182,30 @@ class ChatMessage(Container):
         True if the message has non-whitespace content, False otherwise.
         """
         return len(self._text.strip()) > 0
+    
+    # def update_title(self, title: str) -> None:
+    #     """
+    #     Update the border title of the message.
+
+    #     Parameters
+    #     ----------
+    #     title
+    #         The new title text to display in the border.
+    #     """
+    #     self.query_one(".chat-message-collapsible", Collapsible).border_title = title
+
+    def append_title(self, title: str) -> None:
+        """
+        Append text to the existing base title.
+
+        Parameters
+        ----------
+        title
+            The text to append to the existing title.
+        """
+        self._title_suffix = f"{self._title_suffix}[dim]{title}[/dim]"
+        self.query_one(".chat-message-collapsible", Collapsible).title = self._styled_title()
+        self.display = True
 
     def append_token(self, token: str) -> None:
         """
@@ -116,60 +224,33 @@ class ChatMessage(Container):
         self._text += token
         self.query_one(".chat-message-label", Markdown).update(self._text)
 
-    def update_border_subtitle(self, subtitle: str) -> None:
-        """
-        Update the border subtitle of the message label.
+    # def update_border_subtitle(self, subtitle: str) -> None:
+    #     """
+    #     Update the border subtitle of the message label.
 
-        Parameters
-        ----------
-        subtitle
-            The subtitle text to display in the border.
-        """
-        self.query_one(".chat-message-label", Markdown).border_subtitle = subtitle
+    #     Parameters
+    #     ----------
+    #     subtitle
+    #         The subtitle text to display in the border.
+    #     """
+    #     self.query_one(".chat-message-collapsible", Collapsible).border_subtitle = subtitle
 
-    def update_usage(self, usage: TokenUsage, timings: Timings) -> None:
-        """
-        Update the border subtitle with token usage and timing statistics.
+    # def update_usage(self, usage: TokenUsage, timings: Timings) -> None:
+    #     """
+    #     Update the border subtitle with token usage and timing statistics.
 
-        Parameters
-        ----------
-        usage
-            Token usage counts for this message.
-        timings
-            Timing statistics for prompt and prediction.
-        """
-        self.update_border_subtitle(
-            f"In: {usage.prompt_tokens} ({timings.prompt_per_second:.1f}/s - {timings.cache_n} cached) "
-            f"- Out: {usage.completion_tokens} ({timings.predicted_per_second:.1f}/s) "
-            f"- Total: {usage.total_tokens}"
-        )
-
-
-class LoadingIndicatorChatMessage(ChatMessage):
-    def __init__(self) -> None:
-        """
-        Create a loading indicator chat message.
-        """
-        super().__init__("", "loading")
-
-    def compose(self) -> ComposeResult:
-        """
-        Compose the loading indicator widget.
-
-        Returns
-        -------
-        The composed widgets for this loading indicator message.
-        """
-        border_title = " ".join([word.capitalize() for word in self._role.split("-")])
-        loading = LoadingIndicator(id="loading-indicator")
-        loading.border_title = border_title
-        yield loading
-
-    def dismiss(self) -> None:
-        """
-        Remove this message from the chat history.
-        """
-        self.remove()
+    #     Parameters
+    #     ----------
+    #     usage
+    #         Token usage counts for this message.
+    #     timings
+    #         Timing statistics for prompt and prediction.
+    #     """
+    #     self.update_border_subtitle(
+    #         f"In: {usage.prompt_tokens} ({timings.prompt_per_second:.1f}/s - {timings.cache_n} cached) "
+    #         f"- Out: {usage.completion_tokens} ({timings.predicted_per_second:.1f}/s) "
+    #         f"- Total: {usage.total_tokens}"
+    #     )
 
 
 class ToolCallChatMessage(ChatMessage):
@@ -218,7 +299,7 @@ class ToolCallChatMessage(ChatMessage):
             tool_call_result = self.tool_call.call()
             self.tool_call_result = tool_call_result
             self.append_token(
-                f"\n## Tool call approved. Result:\n\n{tool_call_result.content}"
+                f"\n\nResult:\n\n```json\n{tool_call_result.content}\n```"
             )
         except ValueError:
             self.append_token(

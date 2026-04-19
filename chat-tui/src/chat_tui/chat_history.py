@@ -9,7 +9,7 @@ class ChatHistory(ScrollableContainer):
     _current_index: int = -1
     _autoscroll: bool = True
 
-    def add_message(self, text: str, role: str) -> None:
+    def add_message(self, text: str, role: str) -> ChatMessage:
         """
         Append a new chat message to the history.
 
@@ -19,9 +19,15 @@ class ChatHistory(ScrollableContainer):
             The message content.
         role
             The role of the message sender, e.g. "user" or "assistant".
+
+        Returns
+        -------
+        The ChatMessage widget that was mounted.
         """
-        self.mount(ChatMessage(text, role))
+        message = ChatMessage(text, role)
+        self.mount(message)
         self.scroll_end_if_autoscroll()
+        return message
 
     def scroll_end_if_autoscroll(self) -> None:
         """
