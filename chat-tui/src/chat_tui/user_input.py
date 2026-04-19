@@ -50,7 +50,9 @@ class InputGroup(Widget):
         message
             The submitted message containing the user's text.
         """
-        self._last_user_message = self.app.query_one(ChatHistory).add_message(message.text, "user")
+        self._last_user_message = self.app.query_one(ChatHistory).add_message(
+            message.text, "user"
+        )
         self._last_user_message.mark_loading()
 
     def compose(self) -> ComposeResult:

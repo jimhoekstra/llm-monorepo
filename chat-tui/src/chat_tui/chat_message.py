@@ -22,13 +22,6 @@ _ROLE_TITLE_STYLE: dict[str, str] = {
     "tool-call": "#5faf5f",
 }
 
-# _MUTED_ROLE_TITLE_STYLE: dict[str, str] = {
-#     "assistant": "#02559d",
-#     "reasoning": "#834B2F",
-#     "user": "#373785",
-#     "tool-call": "#285d28",
-# }
-
 
 class ChatMessage(Container):
     """A single chat message bubble."""
@@ -42,17 +35,9 @@ class ChatMessage(Container):
         border-top: none;
     }
 
-    .chat-message-collapsible-assistant {
-        margin-top: 1;
-    }
-
-    .chat-message-collapsible-user {
-        margin-top: 1;
-    }
-
-    .chat-message-collapsible-title {
-        padding: 0;
-        margin: 0;
+    .chat-message-collapsible CollapsibleTitle:focus {
+        color: $text;
+        background: $surface;
     }
 
     ChatMessage {
@@ -62,6 +47,7 @@ class ChatMessage(Container):
 
     ChatMessage .chat-message-label {
         padding: 1 1 0 1;
+        margin: 0;
         background: transparent;
     }
 
@@ -95,7 +81,9 @@ class ChatMessage(Container):
         self._loading_timer: Timer | None = None
 
         self._is_default_collapsed = role in ("reasoning", "tool-call")
-        self._title_text = " ".join([word.capitalize() for word in self._role.split("-")])
+        self._title_text = " ".join(
+            [word.capitalize() for word in self._role.split("-")]
+        )
         self._title_suffix = ""
 
     def compose(self) -> ComposeResult:
@@ -111,12 +99,14 @@ class ChatMessage(Container):
             classes=f"chat-message-label chat-message-label-{self._role}",
             id="chat-message-content",
         )
-        
+
         yield Collapsible(
             label,
             title=self._styled_title(),
             classes=f"chat-message-collapsible chat-message-collapsible-{self._role}",
             collapsed=self._is_default_collapsed,
+            collapsed_symbol=">",
+            expanded_symbol="v",
         )
 
     def _styled_title(self) -> str:
@@ -131,20 +121,6 @@ class ChatMessage(Container):
         title = f"[{style}]{self._title_text}[/{style}]" if style else self._title_text
 
         return f"{title}{self._title_suffix}"
-
-    @on(Collapsible.Collapsed, ".chat-message-collapsible")
-    def _collapsed(self, event: Collapsible.Toggled) -> None:
-        """
-        Update the title style and margin when the collapsible is collapsed.
-        """
-        event.collapsible.styles.margin = (0, 0, 0, 0)
-
-    @on(Collapsible.Expanded, ".chat-message-collapsible")
-    def _expanded(self, event: Collapsible.Toggled) -> None:
-        """
-        Update the title style and margin when the collapsible is expanded.
-        """
-        event.collapsible.styles.margin = (1, 0, 0, 0)
 
     def mark_loading(self) -> None:
         """
@@ -161,7 +137,9 @@ class ChatMessage(Container):
         """
         self._elapsed_time = time.monotonic() - self._start_time
         collapsible = self.query_one(".chat-message-collapsible", Collapsible)
-        collapsible.title = f"{self._styled_title()} [dim]{self._elapsed_time:.1f}s[/dim]"
+        collapsible.title = (
+            f"{self._styled_title()} [dim]{self._elapsed_time:.1f}s[/dim]"
+        )
 
     def mark_complete(self) -> None:
         """
@@ -172,7 +150,7 @@ class ChatMessage(Container):
             self._loading_timer.stop()
             self._loading_timer = None
             self._animate_loading()
-        
+
     def has_text(self) -> bool:
         """
         Check whether this message contains non-whitespace text.
@@ -182,7 +160,7 @@ class ChatMessage(Container):
         True if the message has non-whitespace content, False otherwise.
         """
         return len(self._text.strip()) > 0
-    
+
     # def update_title(self, title: str) -> None:
     #     """
     #     Update the border title of the message.
@@ -204,7 +182,9 @@ class ChatMessage(Container):
             The text to append to the existing title.
         """
         self._title_suffix = f"{self._title_suffix}[dim]{title}[/dim]"
-        self.query_one(".chat-message-collapsible", Collapsible).title = self._styled_title()
+        self.query_one(
+            ".chat-message-collapsible", Collapsible
+        ).title = self._styled_title()
         self.display = True
 
     def append_token(self, token: str) -> None:
@@ -265,7 +245,7 @@ class ToolCallChatMessage(ChatMessage):
         """
         Set the tool call associated with this message.
 
-        If the tool call requires approval, approve and reject buttons will be 
+        If the tool call requires approval, approve and reject buttons will be
         displayed.
 
         Parameters

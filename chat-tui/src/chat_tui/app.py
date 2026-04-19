@@ -29,7 +29,10 @@ from .user_input import UserInput, InputGroup
     requires_approval=False,
 )
 def get_current_time() -> Annotated[
-    str, Description("Information about the current timestamp using UTC timezone and the day of the week in JSON format")
+    str,
+    Description(
+        "Information about the current timestamp using UTC timezone and the day of the week in JSON format"
+    ),
 ]:
     """
     Get the current UTC time as a JSON string.
@@ -54,10 +57,22 @@ def get_current_time() -> Annotated[
     requires_approval=False,
 )
 def convert_timezone(
-    iso_timestamp: Annotated[str, Description("The datetime to convert, in ISO 8601 format")],
-    from_tz: Annotated[str, Description("The IANA time zone name of the input datetime, e.g. 'America/New_York'")],
-    to_tz: Annotated[str, Description("The IANA time zone name to convert to, e.g. 'Europe/London'")],
-) -> Annotated[str, Description("The converted datetime in ISO 8601 format, returned in JSON format")]:
+    iso_timestamp: Annotated[
+        str, Description("The datetime to convert, in ISO 8601 format")
+    ],
+    from_tz: Annotated[
+        str,
+        Description(
+            "The IANA time zone name of the input datetime, e.g. 'America/New_York'"
+        ),
+    ],
+    to_tz: Annotated[
+        str, Description("The IANA time zone name to convert to, e.g. 'Europe/London'")
+    ],
+) -> Annotated[
+    str,
+    Description("The converted datetime in ISO 8601 format, returned in JSON format"),
+]:
     """
     Convert a datetime from one time zone to another.
 
@@ -161,6 +176,7 @@ class ChatApp(App):
         finish_reason = None
 
         collected_chat_messages = []
+
         def mark_messages_as_complete():
             for message in collected_chat_messages:
                 message.mark_complete()
@@ -182,7 +198,7 @@ class ChatApp(App):
                         mark_messages_as_complete()
                         collected_chat_messages.append(reasoning_message)
                         reasoning_message.mark_loading()
-                    
+
                     reasoning_message.append_token(update.reasoning_content)
 
                 if update.content is not None:
@@ -192,7 +208,7 @@ class ChatApp(App):
                         mark_messages_as_complete()
                         collected_chat_messages.append(assistant_message)
                         assistant_message.mark_loading()
-                    
+
                     assistant_message.append_token(update.content)
 
                 if update.tool_calls is not None:
@@ -202,18 +218,14 @@ class ChatApp(App):
                         mark_messages_as_complete()
                         collected_chat_messages.append(tool_calls_message)
                         tool_calls_message.mark_loading()
-                    
-                    if not tool_calls_message.has_text():
-                        tool_calls_message.append_title(
-                            f": {update.tool_calls.name}"
-                        )
 
-                        tool_calls_message.append_token(f"\n\nArgs:\n\n```json\n")
+                    if not tool_calls_message.has_text():
+                        tool_calls_message.append_title(f": {update.tool_calls.name}")
+
+                        tool_calls_message.append_token("\n\nArgs:\n\n```json\n")
 
                     if update.tool_calls.arguments is not None:
-                        tool_calls_message.append_token(
-                            update.tool_calls.arguments
-                        )
+                        tool_calls_message.append_token(update.tool_calls.arguments)
 
                 chat_history.scroll_end_if_autoscroll()
 
@@ -229,13 +241,12 @@ class ChatApp(App):
 
             if (tool_call := response.has_tool_request()) is not None:
                 assert tool_calls_message is not None
-                tool_calls_message.append_token(f"\n```")
+                tool_calls_message.append_token("\n```")
                 await tool_calls_message.set_tool_call(tool_call)
                 chat_history.scroll_end_if_autoscroll()
 
                 if (
-                    tool_call_result
-                    := await tool_calls_message.wait_for_result()
+                    tool_call_result := await tool_calls_message.wait_for_result()
                 ) is not None:
                     self.messages.append(tool_call_result)
 

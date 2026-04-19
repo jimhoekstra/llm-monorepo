@@ -26,12 +26,9 @@
     width: 1fr;
     height: 1fr;
     padding: 1 0 1 1;
-    border: round $secondary;
+    border: round $panel;
     background: transparent;
-}
-
-#editor:focus {
-    border: round $secondary;
+    scrollbar-visibility: hidden;
 }
 
 #preview {
@@ -40,6 +37,7 @@
     padding: 1 0 1 1;
     border: round $panel;
     background: transparent;
+    scrollbar-visibility: hidden;
 }
 
 #preview-md {

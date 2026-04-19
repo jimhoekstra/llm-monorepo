@@ -83,7 +83,9 @@ class NotesApp(App):
             with Vertical(id="main-column"):
                 yield Input(placeholder="untitled.md", id="filename")
                 with ContentSwitcher(initial="editor", id="main"):
-                    yield TextArea(language="markdown", id="editor")
+                    yield TextArea(
+                        language="markdown", id="editor", highlight_cursor_line=False
+                    )
                     with VerticalScroll(id="preview"):
                         yield Markdown(id="preview-md")
                     yield DirectoryTree("notes", id="file-tree")
@@ -133,7 +135,7 @@ class NotesApp(App):
 
         switcher = self.query_one("#main", ContentSwitcher)
         switcher.current = "editor"
-        
+
         self.query_one("#editor", TextArea).focus()
 
     def action_focus_filename(self) -> None:
@@ -187,7 +189,7 @@ class NotesApp(App):
                 self._current_path.rename(new_path)
                 self._current_path = new_path
             self._current_path.write_text(content)
-        
+
         else:
             save_path = Path("notes") / filename
             save_path.write_text(content)

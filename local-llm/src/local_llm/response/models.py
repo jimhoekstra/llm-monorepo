@@ -98,20 +98,20 @@ class ToolCall(BaseModel):
             name=self.function.name,
             arguments=tool_call.function.arguments,
         )
-    
+
     def requires_approval(self) -> bool:
         if self.function is None:
             return True
-        
+
         return tool_requires_approval(self.function.name)
-    
+
     def call(self) -> ToolCallResult:
         if self.function is None:
             return ToolCallResult(
                 tool_call_id=self.id,
                 content="Error: Tool call function is not fully specified.",
             )
-    
+
         try:
             tool_call_args = json.loads(self.function.arguments)
         except json.JSONDecodeError:
@@ -128,17 +128,17 @@ class ToolCall(BaseModel):
             )
 
             return call_tool_result
-        
-        except ValueError as e:
+
+        except ValueError:
             return ToolCallResult(
                 tool_call_id=self.id,
-                content=f"Error calling tool.",
+                content="Error calling tool.",
             )
-        
+
     def reject(self) -> ToolCallResult:
         return ToolCallResult(
             tool_call_id=self.id,
-            content=f"Tool call rejected by user.",
+            content="Tool call rejected by user.",
         )
 
 

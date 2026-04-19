@@ -74,7 +74,9 @@ async def call_llm_async(
             yield item
     else:
         async with aiohttp.ClientSession() as new_session:
-            async for item in _call_llm_async_with_session(messages, tools, new_session):
+            async for item in _call_llm_async_with_session(
+                messages, tools, new_session
+            ):
                 yield item
 
 
@@ -199,7 +201,7 @@ async def _chunks_async(response: aiohttp.ClientResponse) -> AsyncIterator[Chunk
         if not decoded_line.startswith("data: "):
             continue
 
-        data_str = decoded_line[len("data: "):]
+        data_str = decoded_line[len("data: ") :]
         if data_str == "[DONE]":
             break
 
@@ -209,7 +211,6 @@ async def _chunks_async(response: aiohttp.ClientResponse) -> AsyncIterator[Chunk
 
 
 class AsyncLLMRequest:
-
     messages: list[Message | ToolCallResult] | list[Message]
     tools: list[dict]
     is_finished: bool
@@ -256,12 +257,14 @@ class AsyncLLMRequest:
         """
         Run the async LLM request, collecting updates and the final response.
         """
-        async for item in call_llm_async(self.messages, self.tools, session=self._session):
+        async for item in call_llm_async(
+            self.messages, self.tools, session=self._session
+        ):
             if isinstance(item, UpdateSummary):
                 await self._queue.put(item)
             elif isinstance(item, Response):
                 self.response = item
-        
+
         self.is_finished = True
         await self._queue.put(None)
 
@@ -287,7 +290,6 @@ class AsyncLLMRequest:
 
 
 class LLMRequestQueue:
-
     _requests: dict[uuid.UUID, AsyncLLMRequest]
     _session: aiohttp.ClientSession | None
 

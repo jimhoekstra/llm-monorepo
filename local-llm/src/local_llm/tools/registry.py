@@ -1,6 +1,6 @@
 from typing import Annotated, Callable, get_args, get_origin
 from functools import wraps
-from inspect import getdoc, signature, Parameter
+from inspect import signature, Parameter
 
 
 from .models import Tool, ToolArgument, Description
@@ -14,7 +14,9 @@ PYTHON_TO_JSON_TYPE_MAP: dict[type, str] = {
 TOOL_REGISTRY: dict[str, Tool] = {}
 
 
-def register_tool(description: str, requires_approval: bool = True) -> Callable[[Callable[..., str]], Callable[..., str]]:
+def register_tool(
+    description: str, requires_approval: bool = True
+) -> Callable[[Callable[..., str]], Callable[..., str]]:
     """
     Decorator to register a function as a tool.
 
